@@ -1,6 +1,0 @@
-# Output files
-*.exe
-mkdmadata
-mkldscript
-reloc_prereq
-vtxdis
