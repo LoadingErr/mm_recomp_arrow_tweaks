@@ -1975,102 +1975,7 @@ bool Player_IsAimingAndTargeting(Player* this, PlayState* play) {
             (GET_ACTIVE_CAM(play)->mode == CAM_MODE_FOLLOWTARGET));
 }
 
-// Handle arrow cycling
-void CycleArrowsL(Player* this, PlayState* play, Input* input) {
-    EquipSlot bowButton = EQUIP_SLOT_NONE;
-
-    // Find button equipped with bow
-    for (EquipSlot i = EQUIP_SLOT_C_LEFT; i <= EQUIP_SLOT_C_RIGHT; i++) {
-        u8 equippedItem = gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][i];
-        if (CHECK_ITEM_IS_BOW(equippedItem)) {
-            bowButton = i;
-            break;
-        }
-    }
-
-    if (bowButton == EQUIP_SLOT_NONE) {
-        return;
-    }
-
-    bool bowButtonPressed = CHECK_BTN_ALL(input->press.button, sPlayerItemButtons[bowButton]);
-
-    // Store the current value of the equipped bow button
-    u8 previousBowItem = gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton];
-
-    // Check for L press
-    if (CHECK_BTN_ALL(input->press.button, BTN_L)) {
-        do {
-            currentArrowIndex++;
-
-            if (currentArrowIndex >= cyclingArrowCount) {
-                currentArrowIndex = 0;
-            }
-        } while (!((cyclingArrows[currentArrowIndex] == ITEM_BOW && INV_CONTENT(ITEM_BOW) == ITEM_BOW) ||
-                   (cyclingArrows[currentArrowIndex] == ITEM_BOW_FIRE && INV_CONTENT(ITEM_ARROW_FIRE) == ITEM_ARROW_FIRE) ||
-                   (cyclingArrows[currentArrowIndex] == ITEM_BOW_ICE && INV_CONTENT(ITEM_ARROW_ICE) == ITEM_ARROW_ICE) ||
-                   (cyclingArrows[currentArrowIndex] == ITEM_BOW_LIGHT && INV_CONTENT(ITEM_ARROW_LIGHT) == ITEM_ARROW_LIGHT)));
-
-        // Set the current item
-        ItemId currentItem = cyclingArrows[currentArrowIndex];
-        gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton] = currentItem;
-        Interface_LoadItemIcon(play, bowButton);
-
-        // Update the player's held item action
-        switch (currentItem) {
-            case ITEM_BOW:
-                this->heldItemAction = PLAYER_IA_BOW;
-                this->itemAction = PLAYER_IA_BOW;
-                break;
-            case ITEM_BOW_FIRE:
-                this->heldItemAction = PLAYER_IA_BOW_FIRE;
-                this->itemAction = PLAYER_IA_BOW_FIRE;
-                break;
-            case ITEM_BOW_ICE:
-                this->heldItemAction = PLAYER_IA_BOW_ICE;
-                this->itemAction = PLAYER_IA_BOW_ICE;
-                break;
-            case ITEM_BOW_LIGHT:
-                this->heldItemAction = PLAYER_IA_BOW_LIGHT;
-                this->itemAction = PLAYER_IA_BOW_LIGHT;
-                break;
-            default:
-                break;
-        }
-    }
-
-    // Kill current arrow and spawn new one upon cycling
-    u8 bowItem = gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton];
-    if ((bowButtonPressed && deferBowMagicAudio) || (bowItem != previousBowItem)) {
-        u8 magicArrowIndex = bowItem - ITEM_BOW_FIRE;
-        if (this->heldActor != NULL) {
-            u8 arrowType;
-            if (magicArrowIndex >= 0 && magicArrowIndex <= 2) {
-                arrowType = ARROW_TYPE_FIRE + magicArrowIndex;
-            } else {
-                arrowType = ARROW_TYPE_NORMAL;
-            }
-
-            Actor_Kill(this->heldActor);
-            this->heldActor = Actor_SpawnAsChild(
-                &play->actorCtx, &this->actor, play, ACTOR_EN_ARROW, this->actor.world.pos.x,
-                this->actor.world.pos.y, this->actor.world.pos.z, 0, this->actor.shape.rot.y, 0, arrowType);
-        }
-    }
-
-    if ((bowButtonPressed && deferBowMagicAudio) || (bowItem != previousBowItem)) {
-        u8 magicArrowIndex = bowItem - ITEM_BOW_FIRE;
-        if (magicArrowIndex >= 0 && magicArrowIndex <= 2) {
-            if (((gSaveContext.magicState == MAGIC_STATE_IDLE) && (gSaveContext.save.saveInfo.playerData.magic >= sMagicArrowCosts[magicArrowIndex])) || ((CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_SWITCH))) {
-                Audio_PlaySfx(NA_SE_SY_SET_FIRE_ARROW + magicArrowIndex);
-                deferBowMagicAudio = false;
-            } else {
-                deferBowMagicAudio = true;
-            }
-        }
-    }
-}
-
-void CycleArrowsR(Player* this, PlayState* play, Input* input) {
+void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
     EquipSlot bowButton = EQUIP_SLOT_NONE;
 
     // Find button equipped with bow
@@ -2092,7 +1997,7 @@ void CycleArrowsR(Player* this, PlayState* play, Input* input) {
     u8 previousBowItem = gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton];
 
     // Check for R press
-    if (CHECK_BTN_ALL(input->press.button, BTN_R)) {
+    if (CHECK_BTN_ALL(input->press.button, (using_r ? BTN_R : BTN_L))) {
         do {
             currentArrowIndex++;
 
@@ -2132,13 +2037,14 @@ void CycleArrowsR(Player* this, PlayState* play, Input* input) {
         }
     }
 
-    if (((this->stateFlags1 & PLAYER_STATE1_100000) ||
-        ((Player_IsAimingAndTargeting(this, play) ||
-        (GET_ACTIVE_CAM(play)->mode == CAM_MODE_BOWARROWZ)))) && 
-        !Player_IsHoldingHookshot(this)) {
-        input->press.button &= ~BTN_R;
+    if (using_r) {
+        if (((this->stateFlags1 & PLAYER_STATE1_100000) ||
+            ((Player_IsAimingAndTargeting(this, play) ||
+            (GET_ACTIVE_CAM(play)->mode == CAM_MODE_BOWARROWZ)))) && 
+            !Player_IsHoldingHookshot(this)) {
+            input->press.button &= ~BTN_R;
+        }
     }
-
 
     // Kill current arrow and spawn new one upon cycling
     u8 bowItem = gSaveContext.save.saveInfo.equips.buttonItems [CUR_FORM] [bowButton]; 
@@ -2247,15 +2153,11 @@ RECOMP_HOOK("Player_UpdateCommon") void ArrowCycleHandle(Player* this, PlayState
     if (((this->stateFlags1 & PLAYER_STATE1_100000) || 
             ((Player_IsAimingAndTargeting(this, play) ||
             (GET_ACTIVE_CAM(play)->mode == CAM_MODE_BOWARROWZ)))) &&  
-            !Player_IsHoldingHookshot(this) && 
-            (CFG_CYCLING_MODE == CYCLING_MODE_L)) {
-        CycleArrowsL(this, play, input);
-    } else if (((this->stateFlags1 & PLAYER_STATE1_100000) || 
-            ((Player_IsAimingAndTargeting(this, play) ||
-            (GET_ACTIVE_CAM(play)->mode == CAM_MODE_BOWARROWZ)))) &&  
-            !Player_IsHoldingHookshot(this) && 
-            (CFG_CYCLING_MODE == CYCLING_MODE_R)) {
-        CycleArrowsR(this, play, input);
+            !Player_IsHoldingHookshot(this)) {
+        if (CFG_CYCLING_MODE == CYCLING_MODE_L) {
+            CycleArrows(this, play, input, false);
+        } else if (CFG_CYCLING_MODE == CYCLING_MODE_R) {
+            CycleArrows(this, play, input, true);
+        }   
     }
 }
-
