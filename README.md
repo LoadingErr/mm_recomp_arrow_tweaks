@@ -1,8 +1,6 @@
-# Majora's Mask: Recompiled D-Pad Mod
+# Majora's Mask: Recompiled Arrow Tweaks
 
-This is a mod that adds a D-Pad to the HUD for Majora's Mask: Recompiled. The D-Pad lets you activate the transformation masks and the Ocarina of Time without needing to bind them to the C buttons.
-
-This mod was originally part of the Majora's Mask: Recompiled project itself, but has been moved to a mod so it can be turned off to allow mod developers to make their own D-Pad mods with different functionality. This mod is provided as a built-in mod in the project.
+This is a mod that improves bow functionality in Majora's Mask: Recompiled, adding options for mapping the arrow types to the D-Pad as well as cycling through them with the press of a button.
 
 ### Writing mods
 See [this document](https://hackmd.io/fMDiGEJ9TBSjomuZZOgzNg) for an explanation of the modding framework, including how to write function patches and perform interop between different mods.
