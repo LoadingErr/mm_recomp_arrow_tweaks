@@ -138,6 +138,26 @@ RECOMP_CALLBACK("*", recomp_on_init) void on_startup () {
 
 extern u8 sMagicArrowCosts[];
 
+s32 Player_UpperAction_7(Player* thisx, PlayState* play);
+s32 Player_UpperAction_8(Player* thisx, PlayState* play);
+
+bool Player_isHoldingBow(Player* this, PlayState* play) {
+    return (this->heldItemAction == PLAYER_IA_BOW || 
+             this->heldItemAction == PLAYER_IA_BOW_FIRE || 
+             this->heldItemAction == PLAYER_IA_BOW_ICE || 
+             this->heldItemAction == PLAYER_IA_BOW_LIGHT);
+}
+
+bool Player_IsAiming(Player* this, PlayState* play) {
+    return (Player_isHoldingBow(this, play)) &&
+             (this->upperActionFunc == Player_UpperAction_8 ||
+              this->upperActionFunc == Player_UpperAction_7);
+}
+
+bool Player_IsArrowNocked(Player* this, PlayState* play) {
+    return ((Player_isHoldingBow(this, play)) &&
+             (this->upperActionFunc == Player_UpperAction_7));
+}
 u8 getArrowMagic(u8 bowItem) {
     u8 magicArrowIndex = bowItem - ITEM_BOW_FIRE;
     u8 arrowType;
@@ -160,8 +180,9 @@ u8 getArrowMagic(u8 bowItem) {
 void SetArrowMagicInfoHandler(Player* this, PlayState* play, u8 lastArrow, u8 currentArrow) {
     arrow_update.lastArrow = lastArrow;
     arrow_update.currentArrow = currentArrow;
-
-    arrow_update.timer = 3;
+    if(Player_IsArrowNocked(this, play)) {
+        arrow_update.timer = 3;
+    }
 
     recomp_printf("Last Arrow Magic = %i, Current Arrow Magic = %i\n", getArrowMagic(arrow_update.lastArrow), getArrowMagic(arrow_update.currentArrow));
 }
@@ -1969,20 +1990,6 @@ int cyclingArrowCount = sizeof(cyclingArrows) / sizeof(cyclingArrows[4]);
 
 int currentArrowIndex = 0;
 
-s32 Player_UpperAction_7(Player* thisx, PlayState* play);
-s32 Player_UpperAction_8(Player* thisx, PlayState* play);
-
-bool Player_IsAiming(Player* this, PlayState* play) {
-    return ((this->heldItemAction == PLAYER_IA_BOW || 
-             this->heldItemAction == PLAYER_IA_BOW_FIRE || 
-             this->heldItemAction == PLAYER_IA_BOW_ICE || 
-             this->heldItemAction == PLAYER_IA_BOW_LIGHT) &&
-             (this->upperActionFunc == Player_UpperAction_8 ||
-              this->upperActionFunc == Player_UpperAction_7));
-}
-
-
-
 void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
     EquipSlot bowButton = EQUIP_SLOT_NONE;
 
@@ -2191,7 +2198,8 @@ RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
                         this->actor.world.pos.y, this->actor.world.pos.z, 0, this->actor.shape.rot.y, 0, arrowType);
 
                     if ((this->heldActor != NULL) && (magicArrowType > ARROW_MAGIC_INVALID)) {
-                        Magic_Consume(play, sMagicArrowCosts[magicArrowType], MAGIC_CONSUME_WAIT_PREVIEW);
+                        Magic_Consume(play, sMagicArrowCosts[magicArrowType], magicArrowType == (ARROW_GET_MAGIC_FROM_TYPE(arrowType) >= ARROW_MAGIC_FIRE) &&
+                        (ARROW_GET_MAGIC_FROM_TYPE(arrowType) <= ARROW_MAGIC_LIGHT) ? MAGIC_CONSUME_WAIT_PREVIEW : MAGIC_CONSUME_NOW);
                     }
                 }
             }
@@ -2203,6 +2211,16 @@ RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
     return false;
 }
 
-RECOMP_HOOK("Magic_Reset") void print_on_reset(PlayState play) {
-    recomp_printf("Magic_Reset called.\n");
+// Handles draining magic when fired:
+RECOMP_HOOK("func_80831194") void pre_func_80831194(PlayState* play, Player* this) {
+    if (this->heldActor != NULL) {
+        if (!Player_IsHoldingHookshot(this)) {
+            if (
+                gSaveContext.magicState == MAGIC_CONSUME_WAIT_PREVIEW
+            ) {
+                recomp_printf("Consuming Arrow Magic...\n");
+                gSaveContext.magicState = MAGIC_STATE_CONSUME;
+            }
+        }
+    }
 }
