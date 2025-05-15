@@ -125,15 +125,18 @@ s32 dpad_item_icon_positions[4][2] = {
     {           0, ICON_DIST - 2 }
 };
 
+#define ARROW_DEATH_TIMER_MAX 40
 typedef struct {
-    int timer;
+    int type_change_timer;
     u8 lastArrow;
     u8 currentArrow;
+    int arrow_death_timer;
 } NextFrameArrowUpdateInfo;
-NextFrameArrowUpdateInfo arrow_update;
+NextFrameArrowUpdateInfo magic_arrow_info;
 
 RECOMP_CALLBACK("*", recomp_on_init) void on_startup () {
-    arrow_update.timer = 0;
+    magic_arrow_info.type_change_timer = 0;
+    magic_arrow_info.arrow_death_timer = 0;
 }
 
 extern u8 sMagicArrowCosts[];
@@ -178,37 +181,37 @@ u8 getArrowMagic(u8 bowItem) {
 }
 
 void SetArrowMagicInfoHandler(Player* this, PlayState* play, u8 lastArrow, u8 currentArrow) {
-    arrow_update.lastArrow = lastArrow;
-    arrow_update.currentArrow = currentArrow;
+    magic_arrow_info.lastArrow = lastArrow;
+    magic_arrow_info.currentArrow = currentArrow;
     if(Player_IsArrowNocked(this, play)) {
-        arrow_update.timer = 3;
+        magic_arrow_info.type_change_timer = 3;
     }
 
-    recomp_printf("Last Arrow Magic = %i, Current Arrow Magic = %i\n", getArrowMagic(arrow_update.lastArrow), getArrowMagic(arrow_update.currentArrow));
+    recomp_printf("Last Arrow Magic = %i, Current Arrow Magic = %i\n", getArrowMagic(magic_arrow_info.lastArrow), getArrowMagic(magic_arrow_info.currentArrow));
 }
 
 void UpdateArrowMagicHandler(Player* this, PlayState* play) {
-    switch(arrow_update.timer) {
+    switch(magic_arrow_info.type_change_timer) {
         case 3:
-            if (arrow_update.currentArrow == ITEM_BOW) {
+            if (magic_arrow_info.currentArrow == ITEM_BOW) {
                 Magic_Reset(play);
             }
             break;
         case 2:
-            if (arrow_update.lastArrow != ITEM_BOW) {
+            if (magic_arrow_info.lastArrow != ITEM_BOW) {
                 // Magic_Add(play, getArrowMagic(arrow_update.lastArrow));
             }
             break;
         case 1:
-            if (arrow_update.currentArrow != ITEM_BOW) {
-                Magic_Consume(play, getArrowMagic(arrow_update.currentArrow), MAGIC_CONSUME_WAIT_PREVIEW);
+            if (magic_arrow_info.currentArrow != ITEM_BOW) {
+                Magic_Consume(play, getArrowMagic(magic_arrow_info.currentArrow), MAGIC_CONSUME_WAIT_PREVIEW);
             }
             break;
         default:
             return;
     }
 
-    arrow_update.timer--;
+    magic_arrow_info.type_change_timer--;
 }
 
 Gfx* Gfx_DrawRect_DropShadowEx(Gfx* gfx, u16 lorigin, u16 rorigin, s16 rectLeft, s16 rectTop, s16 rectWidth, s16 rectHeight, u16 dsdx, u16 dtdy,
@@ -1895,11 +1898,9 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
             break;
         }
     }
-    recomp_printf("1 ");
     if (bowButton == EQUIP_SLOT_NONE) {
         return;
     }
-    recomp_printf("2 ");
     bool bowButtonPressed = CHECK_BTN_ALL(input->press.button, sPlayerItemButtons[bowButton]);
 
     // Store the current value of the equipped bow button
@@ -1908,6 +1909,11 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
  // Handle D-pad inputs
  for (int extra_slot_index = 0; extra_slot_index < ARRAY_COUNT(buttons_to_extra_slot); extra_slot_index++) {
     if (CHECK_BTN_ALL(input->press.button, buttons_to_extra_slot[extra_slot_index].button)) {
+        if (magic_arrow_info.arrow_death_timer > 0) {
+            Audio_PlaySfx(NA_SE_SY_ERROR);
+            return;
+        }
+
         EquipSlotEx slot = -buttons_to_extra_slot[extra_slot_index].slot;
 
         // Map D-pad directions to arrow types & check if player has the corresponding arrows
@@ -2010,6 +2016,11 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
     u8 previousBowItem = gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton];
     // Check for R press
     if (CHECK_BTN_ALL(input->press.button, using_r ? BTN_R : BTN_L)) {
+        if (magic_arrow_info.arrow_death_timer > 0) {
+            Audio_PlaySfx(NA_SE_SY_ERROR);
+            return;
+        }
+
         do {
             currentArrowIndex++;
 
@@ -2053,7 +2064,6 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
         !Player_IsHoldingHookshot(this)) {
         input->press.button &= ~BTN_R;
     }
-
 
     // Kill current arrow and spawn new one upon cycling
     u8 bowItem = gSaveContext.save.saveInfo.equips.buttonItems [0] [bowButton]; 
@@ -2102,55 +2112,6 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
             }
         }
     }
-}
-
-RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
-    if (Player_IsAiming(this, play) &&
-        !Player_IsHoldingHookshot(this)) { 
-        this->stateFlags1 &= ~PLAYER_STATE1_400000; 
-        input->cur.button &= ~BTN_R; 
-    } else {
-        this->stateFlags1 |= PLAYER_STATE1_400000; 
-    }
-
-    // Update D-pad equips when aiming with the bow
-    if (Player_IsAiming(this, play) &&
-        !Player_IsHoldingHookshot(this) &&
-        (CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_DIRECT)) {
-            recomp_printf("DPAD DIRECT ");
-            dpad_item_icons_loaded = false;
-            extra_button_items = extra_button_items_bow;
-            extra_button_display = extra_button_items_bow;
-            dpad_replace_bow_type(this, play, input);
-            recomp_printf("\n");
-    } else if (Player_IsAiming(this, play) &&
-        !Player_IsHoldingHookshot(this) &&
-        (CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_SWITCH)) {
-            recomp_printf("DPAD SWITCH ");
-            dpad_item_icons_loaded = false;
-            extra_button_items = extra_button_items_bow_switch;
-            extra_button_display = extra_button_items_bow;
-            dpad_replace_bow_type(this, play, input);
-            recomp_printf("\n");
-    } else {
-        dpad_item_icons_loaded = false;
-        extra_button_items = extra_button_items_normal;
-        extra_button_display = extra_button_items_normal;
-        deferBowMagicAudio = false;
-    }
-
-    // Cycle arrows upon button press
-    if (Player_IsAiming(this, play) && 
-        !Player_IsHoldingHookshot(this)  && 
-        (CFG_CYCLING_MODE == CYCLING_MODE_L)) {
-            CycleArrows(this, play, input, false);
-    } else if (Player_IsAiming(this, play) &&
-        !Player_IsHoldingHookshot(this)  && 
-        (CFG_CYCLING_MODE == CYCLING_MODE_R)) {
-            CycleArrows(this, play, input, true);
-    }
-
-    UpdateArrowMagicHandler(this, play);
 }
 
 // Patching magic arrow spawning.
@@ -2209,8 +2170,10 @@ RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
     return false;
 }
 
+
 // Handles draining magic when fired:
 RECOMP_HOOK("func_80831194") void pre_func_80831194(PlayState* play, Player* this) {
+    magic_arrow_info.arrow_death_timer = ARROW_DEATH_TIMER_MAX;
     if (gSaveContext.minigameStatus == MINIGAME_STATUS_ACTIVE || play->bButtonAmmoPlusOne != 0) {
         return;
     }
@@ -2222,7 +2185,59 @@ RECOMP_HOOK("func_80831194") void pre_func_80831194(PlayState* play, Player* thi
             ) {
                 recomp_printf("Consuming Arrow Magic...\n");
                 gSaveContext.magicState = MAGIC_STATE_CONSUME;
+
             }
         }
     }
 }
+
+RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
+    if (Player_IsAiming(this, play) &&
+        !Player_IsHoldingHookshot(this)) { 
+        this->stateFlags1 &= ~PLAYER_STATE1_400000; 
+        input->cur.button &= ~BTN_R; 
+    } else {
+        this->stateFlags1 |= PLAYER_STATE1_400000; 
+    }
+    
+    // If an arrow is destroyed, delay a few frames to make before switching is allowed.
+    // Prevents crashes.
+    if (magic_arrow_info.arrow_death_timer > 0) {
+        magic_arrow_info.arrow_death_timer--;
+    }
+    // Update D-pad equips when aiming with the bow
+    if (Player_IsAiming(this, play) &&
+        !Player_IsHoldingHookshot(this) &&
+        (CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_DIRECT)) {
+            dpad_item_icons_loaded = false;
+            extra_button_items = extra_button_items_bow;
+            extra_button_display = extra_button_items_bow;
+            dpad_replace_bow_type(this, play, input);
+    } else if (Player_IsAiming(this, play) &&
+        !Player_IsHoldingHookshot(this) &&
+        (CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_SWITCH)) {
+            dpad_item_icons_loaded = false;
+            extra_button_items = extra_button_items_bow_switch;
+            extra_button_display = extra_button_items_bow;
+            dpad_replace_bow_type(this, play, input);
+    } else {
+        dpad_item_icons_loaded = false;
+        extra_button_items = extra_button_items_normal;
+        extra_button_display = extra_button_items_normal;
+        deferBowMagicAudio = false;
+    }
+
+    // Cycle arrows upon button press
+    if (Player_IsAiming(this, play) && 
+        !Player_IsHoldingHookshot(this)  && 
+        (CFG_CYCLING_MODE == CYCLING_MODE_L)) {
+            CycleArrows(this, play, input, false);
+    } else if (Player_IsAiming(this, play) &&
+        !Player_IsHoldingHookshot(this)  && 
+        (CFG_CYCLING_MODE == CYCLING_MODE_R)) {
+            CycleArrows(this, play, input, true);
+    }
+    
+    UpdateArrowMagicHandler(this, play);
+}
+
