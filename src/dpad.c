@@ -1889,21 +1889,21 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
 
     // Find button equipped with bow
     for (EquipSlot i = EQUIP_SLOT_C_LEFT; i <= EQUIP_SLOT_C_RIGHT; i++) {
-        u8 equippedItem = gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][i];
+        u8 equippedItem = gSaveContext.save.saveInfo.equips.buttonItems[0][i];
         if (CHECK_ITEM_IS_BOW(equippedItem)) {
             bowButton = i;
             break;
         }
     }
-
+    recomp_printf("1 ");
     if (bowButton == EQUIP_SLOT_NONE) {
         return;
     }
-
+    recomp_printf("2 ");
     bool bowButtonPressed = CHECK_BTN_ALL(input->press.button, sPlayerItemButtons[bowButton]);
 
     // Store the current value of the equipped bow button
-    u8 previousBowItem = gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton];
+    u8 previousBowItem = gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton];
 
  // Handle D-pad inputs
  for (int extra_slot_index = 0; extra_slot_index < ARRAY_COUNT(buttons_to_extra_slot); extra_slot_index++) {
@@ -1914,7 +1914,7 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
         switch (slot) {
             case EQUIP_SLOT_EX_DLEFT:
                 if (INV_CONTENT(ITEM_ARROW_ICE) == ITEM_ARROW_ICE) { 
-                    gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton] = ITEM_BOW_ICE;
+                    gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton] = ITEM_BOW_ICE;
                     Interface_LoadItemIcon(play, bowButton);
                     this->heldItemAction = PLAYER_IA_BOW_ICE;
                     this->itemAction = PLAYER_IA_BOW_ICE;
@@ -1922,7 +1922,7 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
                 break;
             case EQUIP_SLOT_EX_DUP:
                 if (INV_CONTENT(ITEM_ARROW_FIRE) == ITEM_ARROW_FIRE) { 
-                    gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton] = ITEM_BOW_FIRE;
+                    gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton] = ITEM_BOW_FIRE;
                     Interface_LoadItemIcon(play, bowButton);
                     this->heldItemAction = PLAYER_IA_BOW_FIRE;
                     this->itemAction = PLAYER_IA_BOW_FIRE;
@@ -1930,7 +1930,7 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
                 break;
             case EQUIP_SLOT_EX_DRIGHT:
                 if (INV_CONTENT(ITEM_ARROW_LIGHT) == ITEM_ARROW_LIGHT) {
-                    gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton] = ITEM_BOW_LIGHT;
+                    gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton] = ITEM_BOW_LIGHT;
                     Interface_LoadItemIcon(play, bowButton);
                     this->heldItemAction = PLAYER_IA_BOW_LIGHT;
                     this->itemAction = PLAYER_IA_BOW_LIGHT;
@@ -1938,7 +1938,7 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
                 break;
             case EQUIP_SLOT_EX_DDOWN:
                 if (INV_CONTENT(ITEM_BOW) == ITEM_BOW) {
-                    gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton] = ITEM_BOW;
+                    gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton] = ITEM_BOW;
                     Interface_LoadItemIcon(play, bowButton);
                     this->heldItemAction = PLAYER_IA_BOW;
                     this->itemAction = PLAYER_IA_BOW;
@@ -1952,7 +1952,7 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
     }
 
     // Kill current arrow and spawn new one upon cycling
-    u8 bowItem = gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton];
+    u8 bowItem = gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton];
     if ((bowButtonPressed && deferBowMagicAudio) || (bowItem != previousBowItem)) {
         u8 magicArrowIndex = bowItem - ITEM_BOW_FIRE;
         if (this->heldActor != NULL) {
@@ -1985,9 +1985,7 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
 #include "controller.h"
 
 ItemId cyclingArrows[] = { ITEM_BOW, ITEM_BOW_FIRE, ITEM_BOW_ICE, ITEM_BOW_LIGHT };
-
 int cyclingArrowCount = sizeof(cyclingArrows) / sizeof(cyclingArrows[4]);
-
 int currentArrowIndex = 0;
 
 void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
@@ -1995,7 +1993,7 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
 
     // Find button equipped with bow
     for (EquipSlot i = EQUIP_SLOT_C_LEFT; i <= EQUIP_SLOT_C_RIGHT; i++) {
-        u8 equippedItem = gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][i];
+        u8 equippedItem = gSaveContext.save.saveInfo.equips.buttonItems[0][i];
         if (CHECK_ITEM_IS_BOW(equippedItem)) {
             bowButton = i;
             break;
@@ -2009,7 +2007,7 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
     bool bowButtonPressed = CHECK_BTN_ALL(input->press.button, sPlayerItemButtons[bowButton]);
 
     // Store the current value of the equipped bow button
-    u8 previousBowItem = gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton];
+    u8 previousBowItem = gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton];
     // Check for R press
     if (CHECK_BTN_ALL(input->press.button, using_r ? BTN_R : BTN_L)) {
         do {
@@ -2025,7 +2023,7 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
 
         // Set the current item
         ItemId currentItem = cyclingArrows[currentArrowIndex];
-        gSaveContext.save.saveInfo.equips.buttonItems[CUR_FORM][bowButton] = currentItem;
+        gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton] = currentItem;
         Interface_LoadItemIcon(play, bowButton);
 
         // Update the player's held item action
@@ -2058,7 +2056,7 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
 
 
     // Kill current arrow and spawn new one upon cycling
-    u8 bowItem = gSaveContext.save.saveInfo.equips.buttonItems [CUR_FORM] [bowButton]; 
+    u8 bowItem = gSaveContext.save.saveInfo.equips.buttonItems [0] [bowButton]; 
     if ((bowButtonPressed && deferBowMagicAudio) || (bowItem != previousBowItem)) { 
         u8 magicArrowIndex = bowItem - ITEM_BOW_FIRE;
         if (this->heldActor != NULL) {
@@ -2119,17 +2117,21 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
     if (Player_IsAiming(this, play) &&
         !Player_IsHoldingHookshot(this) &&
         (CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_DIRECT)) {
+            recomp_printf("DPAD DIRECT ");
             dpad_item_icons_loaded = false;
             extra_button_items = extra_button_items_bow;
             extra_button_display = extra_button_items_bow;
             dpad_replace_bow_type(this, play, input);
+            recomp_printf("\n");
     } else if (Player_IsAiming(this, play) &&
         !Player_IsHoldingHookshot(this) &&
         (CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_SWITCH)) {
+            recomp_printf("DPAD SWITCH ");
             dpad_item_icons_loaded = false;
             extra_button_items = extra_button_items_bow_switch;
             extra_button_display = extra_button_items_bow;
             dpad_replace_bow_type(this, play, input);
+            recomp_printf("\n");
     } else {
         dpad_item_icons_loaded = false;
         extra_button_items = extra_button_items_normal;
@@ -2152,10 +2154,8 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
 }
 
 // Patching magic arrow spawning.
-
 void Player_SetUpperAction(PlayState* play, Player* this, PlayerUpperActionFunc upperActionFunc);
 extern u16 D_8085CFB0[];
-// Draw bow or hookshot / first person items?
 RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
     if ((this->heldItemAction >= PLAYER_IA_BOW_FIRE) && (this->heldItemAction <= PLAYER_IA_BOW_LIGHT) &&
         (gSaveContext.magicState != MAGIC_STATE_IDLE)) {
@@ -2204,10 +2204,8 @@ RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
                 }
             }
         }
-
         return true;
     }
-
     return false;
 }
 
