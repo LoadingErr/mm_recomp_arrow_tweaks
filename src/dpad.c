@@ -1812,7 +1812,7 @@ RECOMP_PATCH void Player_ProcessItemButtons(Player* this, PlayState* play) {
                 for (int extra_slot_index = 0; extra_slot_index < ARRAY_COUNT(buttons_to_extra_slot); extra_slot_index++) {
                     struct ExButtonMapping slot = buttons_to_extra_slot[extra_slot_index];
                     if (CHECK_BTN_ALL(sPlayerControlInput->cur.button, slot.button)) {
-                        i = slot.slot;
+                        i = (EquipSlot)slot.slot;
                         break;
                     }
                 }
