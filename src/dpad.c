@@ -2213,6 +2213,10 @@ RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
 
 // Handles draining magic when fired:
 RECOMP_HOOK("func_80831194") void pre_func_80831194(PlayState* play, Player* this) {
+    if (gSaveContext.minigameStatus == MINIGAME_STATUS_ACTIVE || play->bButtonAmmoPlusOne != 0) {
+        return;
+    }
+    
     if (this->heldActor != NULL) {
         if (!Player_IsHoldingHookshot(this)) {
             if (
