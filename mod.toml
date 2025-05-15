@@ -22,7 +22,7 @@ Makes switching between arrow types more convenient while aiming the bow."""
 short_description = "Elemental arrow convenience tweaks."
 
 # Authors of this mod.
-authors = [ "Wiseguy", "LoadingError", "danielryb" ]
+authors = [ "Wiseguy", "LoadingError", "danielryb", "LT_Schmiddy"]
 
 # ID of the target recomp game.
 game_id = "mm"
