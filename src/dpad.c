@@ -175,18 +175,17 @@ void UpdateArrowMagicHandler(Player* this, PlayState* play) {
             break;
         case 2:
             if (arrow_update.lastArrow != ITEM_BOW) {
-                Magic_Add(play, getArrowMagic(arrow_update.lastArrow));
+                // Magic_Add(play, getArrowMagic(arrow_update.lastArrow));
             }
             break;
         case 1:
             if (arrow_update.currentArrow != ITEM_BOW) {
-                Magic_Consume(play, getArrowMagic(arrow_update.currentArrow), MAGIC_CONSUME_NOW);
+                Magic_Consume(play, getArrowMagic(arrow_update.currentArrow), MAGIC_CONSUME_WAIT_PREVIEW);
             }
             break;
         default:
             return;
     }
-
 
     arrow_update.timer--;
 }
@@ -1859,7 +1858,7 @@ RECOMP_PATCH void Player_ProcessItemButtons(Player* this, PlayState* play) {
 
 #define CHECK_ITEM_IS_BOW(item) ((item == ITEM_BOW) || ((item >= ITEM_BOW_FIRE) && (item <= ITEM_BOW_LIGHT)))
 
-void func_808305BC(PlayState* play, Player* this, ItemId* item, ArrowType* typeParam);
+s32 func_808305BC(PlayState* play, Player* this, ItemId* item, ArrowType* typeParam);
 
 bool deferBowMagicAudio = false;
 
@@ -1948,6 +1947,7 @@ void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
                 &play->actorCtx, &this->actor, play, ACTOR_EN_ARROW, this->actor.world.pos.x,
                 this->actor.world.pos.y, this->actor.world.pos.z, 0, this->actor.shape.rot.y, 0, arrowType);
         }
+        SetArrowMagicInfoHandler(this, play, previousBowItem, bowItem);
             
         // Compare the current value of the bow button to the stored value & play sfx if they are different
         if (magicArrowIndex >= 0 && magicArrowIndex <= 2) {
@@ -2084,19 +2084,10 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
                 this->heldActor = Actor_SpawnAsChild(
                     &play->actorCtx, &this->actor, play, ACTOR_EN_ARROW, this->actor.world.pos.x,
                     this->actor.world.pos.y, this->actor.world.pos.z, 0, this->actor.shape.rot.y, 0, arrowType);
-                
-            //     if ((this->heldActor != NULL) && (magicArrowType > ARROW_MAGIC_INVALID)) {
-            //         recomp_printf("Magic Arrow Cost: %i\n", sMagicArrowCosts[magicArrowType]);
-            //         Magic_Consume(play, sMagicArrowCosts[magicArrowType], MAGIC_CONSUME_NOW);
-            //     }
             }
             SetArrowMagicInfoHandler(this, play, previousBowItem, bowItem);
         }
-    }
-
-    // Duplicate - Fix later:
-    if ((bowButtonPressed && deferBowMagicAudio) || (bowItem != previousBowItem)) {
-        u8 magicArrowIndex = bowItem - ITEM_BOW_FIRE;
+        
         if (magicArrowIndex >= 0 && magicArrowIndex <= 2) {
             if (((gSaveContext.magicState == MAGIC_STATE_CONSUME) && (gSaveContext.save.saveInfo.playerData.magic >= sMagicArrowCosts[magicArrowIndex])) || ((CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_SWITCH))) {
                 Audio_PlaySfx(NA_SE_SY_SET_FIRE_ARROW + magicArrowIndex);
@@ -2139,20 +2130,6 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
         deferBowMagicAudio = false;
     }
 
-// }
-
-// RECOMP_HOOK("Player_UpdateCommon") void ArrowCycleHandle(Player* this, PlayState* play, Input* input) {
-    
-    // //I think this is a duplicate:
-    // if (Player_IsAiming(this, play) &&
-    //     !Player_IsHoldingHookshot(this)) { 
-    //         this->stateFlags1 &= ~PLAYER_STATE1_400000; 
-    //         input->cur.button &= ~BTN_R; 
-    // } else {
-    //     this->stateFlags1 |= PLAYER_STATE1_400000; 
-    // }
-
-
     // Cycle arrows upon button press
     if (Player_IsAiming(this, play) && 
         !Player_IsHoldingHookshot(this)  && 
@@ -2165,6 +2142,65 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
     }
 
     UpdateArrowMagicHandler(this, play);
+}
+
+// Patching magic arrow spawning.
+
+void Player_SetUpperAction(PlayState* play, Player* this, PlayerUpperActionFunc upperActionFunc);
+extern u16 D_8085CFB0[];
+// Draw bow or hookshot / first person items?
+RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
+    if ((this->heldItemAction >= PLAYER_IA_BOW_FIRE) && (this->heldItemAction <= PLAYER_IA_BOW_LIGHT) &&
+        (gSaveContext.magicState != MAGIC_STATE_IDLE)) {
+        Audio_PlaySfx(NA_SE_SY_ERROR);
+    } else {
+        Player_SetUpperAction(play, this, Player_UpperAction_7);
+
+        this->stateFlags3 |= PLAYER_STATE3_40;
+        this->unk_ACC = 14;
+
+        if (this->unk_B28 >= 0) {
+            s32 var_v1 = ABS_ALT(this->unk_B28);
+            ItemId item;
+            ArrowType arrowType;
+            ArrowMagic magicArrowType;
+
+            if (var_v1 != 2) {
+                Player_PlaySfx(this, D_8085CFB0[var_v1 - 1]);
+            }
+
+            if (!Player_IsHoldingHookshot(this) && (func_808305BC(play, this, &item, &arrowType) > 0)) {
+                if (this->unk_B28 >= 0) {
+                    magicArrowType = ARROW_GET_MAGIC_FROM_TYPE(arrowType);
+
+                    if ((ARROW_GET_MAGIC_FROM_TYPE(arrowType) >= ARROW_MAGIC_FIRE) &&
+                        (ARROW_GET_MAGIC_FROM_TYPE(arrowType) <= ARROW_MAGIC_LIGHT)) {
+                        if (((void)0, gSaveContext.save.saveInfo.playerData.magic) < sMagicArrowCosts[magicArrowType]) {
+                            arrowType = ARROW_TYPE_NORMAL;
+                            magicArrowType = ARROW_MAGIC_INVALID;
+                        }
+                    } else if ((arrowType == ARROW_TYPE_DEKU_BUBBLE) &&
+                               (!CHECK_WEEKEVENTREG(WEEKEVENTREG_08_01) || (play->sceneId != SCENE_BOWLING))) {
+                        magicArrowType = ARROW_MAGIC_DEKU_BUBBLE;
+                    } else {
+                        magicArrowType = ARROW_MAGIC_INVALID;
+                    }
+
+                    this->heldActor = Actor_SpawnAsChild(
+                        &play->actorCtx, &this->actor, play, ACTOR_EN_ARROW, this->actor.world.pos.x,
+                        this->actor.world.pos.y, this->actor.world.pos.z, 0, this->actor.shape.rot.y, 0, arrowType);
+
+                    if ((this->heldActor != NULL) && (magicArrowType > ARROW_MAGIC_INVALID)) {
+                        Magic_Consume(play, sMagicArrowCosts[magicArrowType], MAGIC_CONSUME_WAIT_PREVIEW);
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    return false;
 }
 
 RECOMP_HOOK("Magic_Reset") void print_on_reset(PlayState play) {
