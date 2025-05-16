@@ -207,8 +207,6 @@ void SetArrowMagicInfoHandler(Player* this, PlayState* play, u8 lastArrow, u8 cu
     if(Player_IsArrowNocked(this, play)) {
         magic_arrow_info.type_change_timer = 3;
     }
-
-    recomp_printf("Last Arrow Magic = %i, Current Arrow Magic = %i\n", getArrowMagic(magic_arrow_info.lastArrow), getArrowMagic(magic_arrow_info.currentArrow));
 }
 
 void UpdateArrowMagicHandler(Player* this, PlayState* play) {
@@ -1923,7 +1921,6 @@ s32 func_808305BC(PlayState* play, Player* this, ItemId* item, ArrowType* typePa
 bool deferBowMagicAudio = false;
 
 void dpad_replace_bow_type(Player* this, PlayState* play, Input* input) {
-   // Lib_MemCpy(extra_button_items_normal, extra_button_items_bow, sizeof(extra_button_items_normal));
     EquipSlot bowButton = EQUIP_SLOT_NONE;
 
     // Find button equipped with bow
@@ -2050,9 +2047,10 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
 
     // Store the current value of the equipped bow button
     u8 previousBowItem = gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton];
-    // Check for R press
+
+    // Check for shoulder press
     if (CHECK_BTN_ALL(input->press.button, using_r ? BTN_R : BTN_L)) {
-        if (magic_arrow_info.arrow_death_timer > 0) {
+        if ((magic_arrow_info.arrow_death_timer > 0) && (cyclingArrows[currentArrowIndex] != ITEM_BOW)) {
             Audio_PlaySfx(NA_SE_SY_ERROR);
             return;
         }
@@ -2073,7 +2071,7 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
         gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton] = currentItem;
         Interface_LoadItemIcon(play, bowButton);
 
-        // Update the player's held item action
+        // Update held item action
         switch (currentItem) {
             case ITEM_BOW:
                 this->heldItemAction = PLAYER_IA_BOW;
@@ -2099,6 +2097,7 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
     if (Player_IsAiming(this, play) && 
         !Player_IsHoldingHookshot(this)) {
         input->press.button &= ~BTN_R;
+        input->press.button &= ~BTN_L;
     }
 
     // Kill current arrow and spawn new one upon cycling
@@ -2212,6 +2211,7 @@ RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
     return false;
 }
 
+RECOMP_DECLARE_EVENT(recomp_on_play_main(PlayState* play)); 
 
 // Handles draining magic when fired:
 RECOMP_HOOK("func_80831194") void pre_func_80831194(PlayState* play, Player* this) {
@@ -2230,9 +2230,30 @@ RECOMP_HOOK("func_80831194") void pre_func_80831194(PlayState* play, Player* thi
             if (
                 gSaveContext.magicState == MAGIC_CONSUME_WAIT_PREVIEW
             ) {
-                recomp_printf("Consuming Arrow Magic...\n");
                 gSaveContext.magicState = MAGIC_STATE_CONSUME;
+            }
+        }
+    }
+}
 
+// Prevent minimap toggle while aiming if L config selected
+RECOMP_HOOK("MapDisp_Update")
+void pre_MapDisp_Update(PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    static int originalMapDisplayValue = -1;
+
+    if (CFG_CYCLING_MODE == CYCLING_MODE_L) {
+        if (Player_IsAiming(player, play) && !Player_IsHoldingHookshot(player)) {
+            if (originalMapDisplayValue == -1) {
+                originalMapDisplayValue = R_MINIMAP_DISABLED;
+            }
+            R_MINIMAP_DISABLED = originalMapDisplayValue;
+            AudioSfx_StopById(NA_SE_SY_CAMERA_ZOOM_UP);
+            AudioSfx_StopById(NA_SE_SY_CAMERA_ZOOM_DOWN);
+        } else {
+            if (originalMapDisplayValue != -1) {
+                R_MINIMAP_DISABLED = originalMapDisplayValue;
+                originalMapDisplayValue = -1;
             }
         }
     }
@@ -2244,17 +2265,15 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
         return;
     }
 
-    // Kafei prevention.
-    if (this->actor.id != ACTOR_PLAYER) {
-        return;
-    }
-
-    if (Player_IsAiming(this, play) &&
-        !Player_IsHoldingHookshot(this)) { 
-        this->stateFlags1 &= ~PLAYER_STATE1_400000; 
-        input->cur.button &= ~BTN_R; 
-    } else {
-        this->stateFlags1 |= PLAYER_STATE1_400000; 
+    // Prevent shielding while aiming if R config selected
+    if (CFG_CYCLING_MODE == CYCLING_MODE_R) {
+        if (Player_IsAiming(this, play) &&
+            !Player_IsHoldingHookshot(this)) { 
+            this->stateFlags1 &= ~PLAYER_STATE1_400000; 
+            input->cur.button &= ~BTN_R; 
+        } else {
+            this->stateFlags1 |= PLAYER_STATE1_400000; 
+        }
     }
     
     // If an arrow is destroyed, delay a few frames to make before switching is allowed.
