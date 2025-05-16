@@ -118,12 +118,21 @@ struct ExButtonMapping buttons_to_extra_slot[] = {
     {BTN_DDOWN,  -EQUIP_SLOT_EX_DDOWN},
 };
 
-s32 dpad_item_icon_positions[4][2] = {
+s32 dpad_mask_icon_positions[4][2] = {
     {           0, -ICON_DIST},
     { -ICON_DIST, 0          },
     {  ICON_DIST, 0          },
     {           0, ICON_DIST - 2 }
 };
+
+s32 dpad_arrow_icon_positions[4][2] = {
+    {          1,  -ICON_DIST - 1},
+    { -ICON_DIST + 3, -2         },
+    {  ICON_DIST , -2            },
+    {           -1, ICON_DIST - 2}
+};
+
+s32 (*dpad_item_icon_positions)[4][2];
 
 // Handling for arrows and magic:
 #define ARROW_DEATH_TIMER_MAX 40
@@ -297,6 +306,11 @@ bool dpad_item_icons_loaded = false;
 u8 dpad_item_textures[4][ICON_IMG_SIZE * ICON_IMG_SIZE * 4] __attribute__((aligned(8)));
 
 RECOMP_HOOK("Interface_DrawCButtonIcons") void draw_dpad_icons(PlayState* play) {
+    // Just in case:
+    if (dpad_item_icon_positions == NULL) {
+        dpad_item_icon_positions = &dpad_mask_icon_positions;
+    }
+
     PauseContext* pauseCtx = &play->pauseCtx;
     if (pauseCtx->state != PAUSE_STATE_MAIN && recomp_get_config_u32("draw_dpad") == 1) {
         if (!dpad_item_icons_loaded) {
@@ -326,8 +340,8 @@ RECOMP_HOOK("Interface_DrawCButtonIcons") void draw_dpad_icons(PlayState* play) 
                                     G_TX_NOMIRROR | G_TX_WRAP, G_TX_NOMASK, G_TX_NOMASK, G_TX_NOLOD, G_TX_NOLOD);
                 gDPSetPrimColor(OVERLAY_DISP++, 0, 0, 255, 255, 255, extra_item_slot_alphas[i]);
                 gEXTextureRectangle(OVERLAY_DISP++, G_EX_ORIGIN_LEFT, G_EX_ORIGIN_LEFT,
-                    (dpad_item_icon_positions[i][0] + DPAD_CENTER_X - (ICON_SIZE/2)) * 4, (dpad_item_icon_positions[i][1] + DPAD_CENTER_Y - (ICON_SIZE/2)) * 4,
-                    (dpad_item_icon_positions[i][0] + DPAD_CENTER_X + (ICON_SIZE/2)) * 4, (dpad_item_icon_positions[i][1] + DPAD_CENTER_Y + (ICON_SIZE/2)) * 4,
+                    ((*dpad_item_icon_positions)[i][0] + DPAD_CENTER_X - (ICON_SIZE/2)) * 4, ((*dpad_item_icon_positions)[i][1] + DPAD_CENTER_Y - (ICON_SIZE/2)) * 4,
+                    ((*dpad_item_icon_positions)[i][0] + DPAD_CENTER_X + (ICON_SIZE/2)) * 4, ((*dpad_item_icon_positions)[i][1] + DPAD_CENTER_Y + (ICON_SIZE/2)) * 4,
                     0,
                     0, 0,
                     ICON_DSDX, ICON_DTDY);
@@ -2186,8 +2200,9 @@ RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
                         this->actor.world.pos.y, this->actor.world.pos.z, 0, this->actor.shape.rot.y, 0, arrowType);
 
                     if ((this->heldActor != NULL) && (magicArrowType > ARROW_MAGIC_INVALID)) {
-                        Magic_Consume(play, sMagicArrowCosts[magicArrowType], (ARROW_GET_MAGIC_FROM_TYPE(arrowType) == ARROW_MAGIC_FIRE &&
-                        ARROW_GET_MAGIC_FROM_TYPE(arrowType) <= ARROW_MAGIC_LIGHT ? MAGIC_CONSUME_NOW : MAGIC_CONSUME_WAIT_PREVIEW));
+                        recomp_printf("Consuming Magic 1\n");
+                        Magic_Consume(play, sMagicArrowCosts[magicArrowType], (ARROW_GET_MAGIC_FROM_TYPE(arrowType) <= ARROW_MAGIC_FIRE &&
+                        ARROW_GET_MAGIC_FROM_TYPE(arrowType) >= ARROW_MAGIC_LIGHT ? MAGIC_CONSUME_NOW : MAGIC_CONSUME_WAIT_PREVIEW));
                     }
                 }
             }
@@ -2254,6 +2269,7 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
             dpad_item_icons_loaded = false;
             extra_button_items = extra_button_items_bow;
             extra_button_display = extra_button_items_bow;
+            dpad_item_icon_positions = &dpad_arrow_icon_positions;
             dpad_replace_bow_type(this, play, input);
     } else if (shouldAllowArrowDPad(this, play) &&
         !Player_IsHoldingHookshot(this) &&
@@ -2261,11 +2277,13 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
             dpad_item_icons_loaded = false;
             extra_button_items = extra_button_items_bow_switch;
             extra_button_display = extra_button_items_bow;
+            dpad_item_icon_positions = &dpad_arrow_icon_positions;
             dpad_replace_bow_type(this, play, input);
     } else {
         dpad_item_icons_loaded = false;
         extra_button_items = extra_button_items_normal;
         extra_button_display = extra_button_items_normal;
+        dpad_item_icon_positions = &dpad_mask_icon_positions;
         deferBowMagicAudio = false;
     }
 
