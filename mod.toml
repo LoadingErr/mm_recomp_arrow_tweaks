@@ -78,7 +78,19 @@ Direct - Shoot arrows from the D-Pad
 Switch - D-Pad only switches arrow type"""
 type = "Enum"
 options = [ "Default", "Direct", "Switch" ]
-default = "Default"
+default = "Switch"
+
+[[manifest.config_options]]
+id = "dpad_aiming_required"
+name = "D-Pad: Aiming Required"
+description = """
+Choose when you can switch arrows with the D-Pad.
+On - You must be aiming to switch arrows.
+Off - You can switch arrows as long as you are holding the bow.
+"""
+type = "Enum"
+options = ["Off", "On"]
+default = "On"
 
 [[manifest.config_options]]
 id = "arrow_cycling"
@@ -86,4 +98,16 @@ name = "Arrow Cycling"
 description = "Choose how Arrow Cycling behaves."
 type = "Enum"
 options = [ "Default", "Cycle with L", "Cycle with R" ]
-default = "Default"
+default = "Cycle with L"
+
+[[manifest.config_options]]
+id = "arrow_cycling_aiming_required"
+name = "Arrow Cycling: Aiming Required"
+description = """
+Choose when you can cycle arrows.
+On - You must be aiming to cycle arrows.
+Off - You can switch cycle as long as you are holding the bow.
+"""
+type = "Enum"
+options = ["Off", "On"]
+default = "On"

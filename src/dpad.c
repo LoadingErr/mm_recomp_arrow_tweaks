@@ -161,6 +161,17 @@ bool Player_IsArrowNocked(Player* this, PlayState* play) {
     return ((Player_isHoldingBow(this, play)) &&
              (this->upperActionFunc == Player_UpperAction_7));
 }
+
+bool shouldAllowArrowDPad(Player* this, PlayState* play) {
+    return (recomp_get_config_u32("dpad_aiming_required") && Player_IsAiming(this, play)) 
+        || (!recomp_get_config_u32("dpad_aiming_required") && Player_isHoldingBow(this, play));
+}
+
+bool shouldAllowArrowCycling(Player* this, PlayState* play) {
+    return (recomp_get_config_u32("arrow_cycling_aiming_required") && Player_IsAiming(this, play)) 
+        || (!recomp_get_config_u32("arrow_cycling_aiming_required") && Player_isHoldingBow(this, play));
+}
+
 u8 getArrowMagic(u8 bowItem) {
     u8 magicArrowIndex = bowItem - ITEM_BOW_FIRE;
     u8 arrowType;
@@ -2192,6 +2203,8 @@ RECOMP_HOOK("func_80831194") void pre_func_80831194(PlayState* play, Player* thi
 }
 
 RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
+
+
     if (Player_IsAiming(this, play) &&
         !Player_IsHoldingHookshot(this)) { 
         this->stateFlags1 &= ~PLAYER_STATE1_400000; 
@@ -2206,14 +2219,14 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
         magic_arrow_info.arrow_death_timer--;
     }
     // Update D-pad equips when aiming with the bow
-    if (Player_IsAiming(this, play) &&
+    if (shouldAllowArrowDPad(this, play) &&
         !Player_IsHoldingHookshot(this) &&
         (CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_DIRECT)) {
             dpad_item_icons_loaded = false;
             extra_button_items = extra_button_items_bow;
             extra_button_display = extra_button_items_bow;
             dpad_replace_bow_type(this, play, input);
-    } else if (Player_IsAiming(this, play) &&
+    } else if (shouldAllowArrowDPad(this, play) &&
         !Player_IsHoldingHookshot(this) &&
         (CFG_DPAD_USAGE_MODE == DPAD_USAGE_MODE_SWITCH)) {
             dpad_item_icons_loaded = false;
@@ -2228,11 +2241,11 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
     }
 
     // Cycle arrows upon button press
-    if (Player_IsAiming(this, play) && 
+    if (shouldAllowArrowCycling(this, play) && 
         !Player_IsHoldingHookshot(this)  && 
         (CFG_CYCLING_MODE == CYCLING_MODE_L)) {
             CycleArrows(this, play, input, false);
-    } else if (Player_IsAiming(this, play) &&
+    } else if (shouldAllowArrowCycling(this, play) &&
         !Player_IsHoldingHookshot(this)  && 
         (CFG_CYCLING_MODE == CYCLING_MODE_R)) {
             CycleArrows(this, play, input, true);
