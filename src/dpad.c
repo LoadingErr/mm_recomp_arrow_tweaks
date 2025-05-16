@@ -125,6 +125,7 @@ s32 dpad_item_icon_positions[4][2] = {
     {           0, ICON_DIST - 2 }
 };
 
+// Handling for arrows and magic:
 #define ARROW_DEATH_TIMER_MAX 40
 typedef struct {
     int type_change_timer;
@@ -452,6 +453,11 @@ RECOMP_PATCH ItemId Player_GetItemOnButton(PlayState* play, Player* player, Equi
 
 // @mod Patched to also check for d-pad buttons for skipping the transformation cutscene.
 RECOMP_PATCH void Player_Action_86(Player *this, PlayState *play) {
+    // Kafei prevention.
+    if (this->actor.id != ACTOR_PLAYER) {
+        return;
+    }
+
     struct_8085D910 *sp4C = D_8085D910;
     s32 sp48 = false;
 
@@ -1781,6 +1787,11 @@ void func_80839A10(PlayState* play, Player* this);
 extern s32 sPlayerHeldItemButtonIsHeldDown;
 
 RECOMP_PATCH void Player_ProcessItemButtons(Player* this, PlayState* play) {
+    // Kafei prevention.
+    if (this->actor.id != ACTOR_PLAYER) {
+        return;
+    }
+
     if (this->stateFlags1 & (PLAYER_STATE1_CARRYING_ACTOR | PLAYER_STATE1_20000000)) {
         return;
     }
@@ -2129,6 +2140,11 @@ void CycleArrows(Player* this, PlayState* play, Input* input, bool using_r) {
 void Player_SetUpperAction(PlayState* play, Player* this, PlayerUpperActionFunc upperActionFunc);
 extern u16 D_8085CFB0[];
 RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
+    // Kafei prevention.
+    if (this->actor.id != ACTOR_PLAYER) {
+        return false;
+    }
+
     if ((this->heldItemAction >= PLAYER_IA_BOW_FIRE) && (this->heldItemAction <= PLAYER_IA_BOW_LIGHT) &&
         (gSaveContext.magicState != MAGIC_STATE_IDLE)) {
         Audio_PlaySfx(NA_SE_SY_ERROR);
@@ -2184,6 +2200,11 @@ RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
 
 // Handles draining magic when fired:
 RECOMP_HOOK("func_80831194") void pre_func_80831194(PlayState* play, Player* this) {
+    // Kafei prevention.
+    if (this->actor.id != ACTOR_PLAYER) {
+        return;
+    }
+
     magic_arrow_info.arrow_death_timer = ARROW_DEATH_TIMER_MAX;
     if (gSaveContext.minigameStatus == MINIGAME_STATUS_ACTIVE || play->bButtonAmmoPlusOne != 0) {
         return;
@@ -2203,7 +2224,15 @@ RECOMP_HOOK("func_80831194") void pre_func_80831194(PlayState* play, Player* thi
 }
 
 RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, PlayState* play, Input* input) {
+    // Kafei prevention.
+    if (this->actor.id != ACTOR_PLAYER) {
+        return;
+    }
 
+    // Kafei prevention.
+    if (this->actor.id != ACTOR_PLAYER) {
+        return;
+    }
 
     if (Player_IsAiming(this, play) &&
         !Player_IsHoldingHookshot(this)) { 
