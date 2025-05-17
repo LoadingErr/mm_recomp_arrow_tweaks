@@ -2199,9 +2199,7 @@ RECOMP_PATCH s32 func_808306F8(Player* this, PlayState* play) {
                         this->actor.world.pos.y, this->actor.world.pos.z, 0, this->actor.shape.rot.y, 0, arrowType);
 
                     if ((this->heldActor != NULL) && (magicArrowType > ARROW_MAGIC_INVALID)) {
-                        recomp_printf("Consuming Magic 1\n");
-                        Magic_Consume(play, sMagicArrowCosts[magicArrowType], (ARROW_GET_MAGIC_FROM_TYPE(arrowType) <= ARROW_MAGIC_FIRE &&
-                        ARROW_GET_MAGIC_FROM_TYPE(arrowType) >= ARROW_MAGIC_LIGHT ? MAGIC_CONSUME_NOW : MAGIC_CONSUME_WAIT_PREVIEW));
+                        Magic_Consume(play, sMagicArrowCosts[magicArrowType], (this->transformation == PLAYER_FORM_DEKU ? MAGIC_CONSUME_NOW : MAGIC_CONSUME_WAIT_PREVIEW));
                     }
                 }
             }
