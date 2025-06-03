@@ -5,17 +5,18 @@
 
 # Unique ID of this mod. Pick something long enough that it'll never be the same as any other mod.
 # The name displayed in the mod management menu is separate from this so this doesn't need to be human readable.
-id = "mm_recomp_arrow_tweaks"
+id = "mm_recomp_arrow_cycling"
 
 # Version of this mod.
-version = "1.0.4"
+version = "1.0.0"
 
 # The name that will show up for this mod in the mod menu. This should be human readable.
-display_name = "Arrow Tweaks"
+display_name = "Arrow Cycling Only"
 
 # The description that will show up when this mod is displayed in the mod menu. This should be human readable.
 description =  """
-Makes switching between arrow types more convenient while aiming the bow."""
+Allows cycling between arrow types with L or R while
+aiming the bow."""
 
 # A short description that will show up in this mod's entry in the mod list. This should be human readable and kept short
 # to prevent it from being cut off due to the limited space.
@@ -23,7 +24,7 @@ short_description = "Elemental arrow convenience tweaks."
 
 # Authors of this mod.
 
-authors = [ "Wiseguy", "LoadingError", "danielryb", "LT_Schmiddy"]
+authors = [ "LoadingError", "danielryb", "LT_Schmiddy"]
 
 # ID of the target recomp game.
 game_id = "mm"
@@ -50,7 +51,7 @@ native_libraries = [
 elf_path = "build/mod.elf"
 
 # Output mod filename.
-mod_filename = "mm_recomp_arrow_tweaks"
+mod_filename = "mm_recomp_arrow_cycling"
 
 # Reference symbol files.
 func_reference_syms_file = "Zelda64RecompSyms/mm.us.rev1.syms.toml"
@@ -62,53 +63,9 @@ additional_files = [
 ]
 
 [[manifest.config_options]]
-id = "draw_dpad"
-name = "Show HUD Icons"
-description = "Controls whether the D-Pad and the items mapped to it are shown on the screen."
-type = "Enum"
-options = [ "Off", "On" ]
-default = "On"
-
-[[manifest.config_options]]
-id = "dpad_usage"
-name = "D-Pad Usage"
-description = """
-Choose how the D-Pad behaves when aiming the bow.
-Default - The D-Pad remains unchanged
-Direct - Shoot arrows from the D-Pad
-Switch - D-Pad only switches arrow type"""
-type = "Enum"
-options = [ "Default", "Direct", "Switch" ]
-default = "Switch"
-
-[[manifest.config_options]]
-id = "dpad_aiming_required"
-name = "D-Pad: Aiming Required"
-description = """
-Choose when you can switch arrows with the D-Pad.
-On - You must be aiming to switch arrows.
-Off - You can switch arrows as long as you are holding the bow.
-"""
-type = "Enum"
-options = ["Off", "On"]
-default = "On"
-
-[[manifest.config_options]]
 id = "arrow_cycling"
-name = "Arrow Cycling"
+name = "Cycling Button"
 description = "Choose how Arrow Cycling behaves."
 type = "Enum"
 options = [ "Default", "Cycle with L", "Cycle with R" ]
-default = "Cycle with L"
-
-[[manifest.config_options]]
-id = "arrow_cycling_aiming_required"
-name = "Arrow Cycling: Aiming Required"
-description = """
-Choose when you can cycle arrows.
-On - You must be aiming to cycle arrows.
-Off - You can switch cycle as long as you are holding the bow.
-"""
-type = "Enum"
-options = ["Off", "On"]
-default = "On"
+default = "Cycle with R"
