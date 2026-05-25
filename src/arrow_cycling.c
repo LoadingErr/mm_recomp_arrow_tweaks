@@ -36,20 +36,25 @@ typedef struct {
 } NextFrameArrowUpdateInfo;
 NextFrameArrowUpdateInfo magic_arrow_info;
 
+RECOMP_CALLBACK("*", recomp_on_init) void on_startup () {
+    magic_arrow_info.type_change_timer = 0;
+    magic_arrow_info.arrow_death_timer = 0;
+}
+
 typedef struct {
     ItemId item;
     u8 slot;
     bool(*is_available)();
 } CyclingArrowEntry;
 
-typedef void (*ArrowCyclingAddEntryFunc)(CyclingArrowEntry entry);
-
 static bool normal_arrow_is_available() { return INV_CONTENT(ITEM_BOW) == ITEM_BOW; }
 static bool fire_arrow_is_available() { return INV_CONTENT(ITEM_ARROW_FIRE) == ITEM_ARROW_FIRE; }
 static bool ice_arrow_is_available() { return INV_CONTENT(ITEM_ARROW_ICE) == ITEM_ARROW_ICE; }
 static bool light_arrow_is_available() { return INV_CONTENT(ITEM_ARROW_LIGHT) == ITEM_ARROW_LIGHT; }
 
-CyclingArrowEntry cyclingArrows[] = {
+#define CYCLING_ARROW_TYPES_MAX 16
+
+CyclingArrowEntry cyclingArrows[CYCLING_ARROW_TYPES_MAX] = {
     { ITEM_BOW, SLOT_BOW, normal_arrow_is_available  },
     { ITEM_BOW_FIRE, SLOT_BOW, fire_arrow_is_available },
     { ITEM_BOW_ICE, SLOT_BOW, ice_arrow_is_available },
@@ -171,14 +176,15 @@ bool deferBowMagicAudio = false;
 
 #include "controller.h"
 
-int cyclingArrowCount = sizeof(cyclingArrows) / sizeof(cyclingArrows[4]);
+int cyclingArrowCount = 4; 
 
-#define CYCLING_ARROW_TYPES_MAX 16
-
-void ArrowCycling_AddArrowEntry(CyclingArrowEntry entry) {
+RECOMP_EXPORT int AddArrowEntry(CyclingArrowEntry entry) {
     if(cyclingArrowCount < CYCLING_ARROW_TYPES_MAX) {
         cyclingArrows[cyclingArrowCount] = entry;
-        cyclingArrowCount++;
+        return cyclingArrowCount++;
+    } else {
+        recomp_printf("Arrow type capacity exceeded!");
+        return -1;
     }
 }
 
@@ -474,13 +480,4 @@ RECOMP_HOOK("Player_UpdateCommon") void pre_Player_UpdateCommon(Player* this, Pl
     }
     
     UpdateArrowMagicHandler(this, play);
-}
-
-RECOMP_DECLARE_EVENT(ArrowCycling_RegisterArrowEntries(
-    ArrowCyclingAddEntryFunc add_entry));
-
-RECOMP_CALLBACK("*", recomp_on_init) void on_startup () {
-    magic_arrow_info.type_change_timer = 0;
-    magic_arrow_info.arrow_death_timer = 0;
-    ArrowCycling_RegisterArrowEntries(ArrowCycling_AddArrowEntry);
 }
