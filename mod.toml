@@ -11,10 +11,10 @@ id = "mm_recomp_arrow_cycling"
 version = "1.0.1"
 
 # The name that will show up for this mod in the mod menu. This should be human readable.
-display_name = "Arrow Cycling Only"
+display_name = "Arrow Cycling"
 
 # The description that will show up when this mod is displayed in the mod menu. This should be human readable.
-description =  """
+description = """
 Allows cycling between arrow types with L or R while
 aiming the bow."""
 
@@ -24,7 +24,7 @@ short_description = "Elemental arrow convenience tweaks."
 
 # Authors of this mod.
 
-authors = [ "LoadingError", "danielryb", "LT_Schmiddy"]
+authors = ["LoadingError", "danielryb", "LT_Schmiddy"]
 
 # ID of the target recomp game.
 game_id = "mm"
@@ -34,14 +34,14 @@ minimum_recomp_version = "1.2.0"
 
 # Dependency mods. Each entry is the mod's ID and then an optional minimum version of the dependency mod.
 dependencies = [
-# Example dependency:
-#    "modname:1.0.0"
+    # Example dependency:
+    #    "modname:1.0.0"
 ]
 
 # Native libraries (e.g. DLLs) and the functions they export.
 native_libraries = [
-# Example native library:
-#    { name = "my_native_library", funcs = ["my_native_library_function"] }
+    # Example native library:
+    #    { name = "my_native_library", funcs = ["my_native_library_function"] }
 ]
 
 # Inputs to the mod tool.
@@ -55,17 +55,18 @@ mod_filename = "mm_recomp_arrow_cycling"
 
 # Reference symbol files.
 func_reference_syms_file = "Zelda64RecompSyms/mm.us.rev1.syms.toml"
-data_reference_syms_files = [ "Zelda64RecompSyms/mm.us.rev1.datasyms.toml", "Zelda64RecompSyms/mm.us.rev1.datasyms_static.toml" ]
+data_reference_syms_files = [
+    "Zelda64RecompSyms/mm.us.rev1.datasyms.toml",
+    "Zelda64RecompSyms/mm.us.rev1.datasyms_static.toml",
+]
 
 # Additional files to include in the mod.
-additional_files = [
-    "thumb.dds"
-]
+additional_files = ["thumb.dds"]
 
 [[manifest.config_options]]
 id = "arrow_cycling"
 name = "Cycling Button"
 description = "Choose how Arrow Cycling behaves."
 type = "Enum"
-options = [ "No Cycling", "Cycle with L", "Cycle with R" ]
+options = ["No Cycling", "Cycle with L", "Cycle with R"]
 default = "Cycle with R"
