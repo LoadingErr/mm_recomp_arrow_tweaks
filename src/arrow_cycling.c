@@ -100,19 +100,51 @@ static void UpdateArrowMagicHandler(Player* this, PlayState* play) {
 
 bool deferBowMagicAudio = false;
 
-int cyclingArrowCount = 4;
+int cyclingArrowCount = CYCLING_ARROW_BUILTIN_COUNT;
+int currentArrowIndex = 0;
 
 RECOMP_EXPORT int AddArrowEntry(CyclingArrowEntry entry) {
+  // Removed external entries leave empty slots so their indices stay valid for
+  // other mods. Reuse one before extending the queue.
+  for (int i = CYCLING_ARROW_BUILTIN_COUNT; i < cyclingArrowCount; i++) {
+    if (cyclingArrows[i].is_available == NULL) {
+      cyclingArrows[i] = entry;
+      return i;
+    }
+  }
+
   if (cyclingArrowCount < CYCLING_ARROW_TYPES_MAX) {
     cyclingArrows[cyclingArrowCount] = entry;
     return cyclingArrowCount++;
-  } else {
-    recomp_printf("Arrow type capacity exceeded!");
-    return -1;
   }
+
+  recomp_printf("Arrow type capacity exceeded!");
+  return -1;
 }
 
-int currentArrowIndex = 0;
+RECOMP_EXPORT int RemoveArrowEntry(int index) {
+  // Built-in entries guarantee that there is always a valid base arrow to
+  // cycle to, so only externally registered entries can be removed.
+  if (index < CYCLING_ARROW_BUILTIN_COUNT || index >= cyclingArrowCount) {
+    return -1;
+  }
+
+  // Preserve the indices of other external entries. CycleArrows ignores empty
+  // slots, and AddArrowEntry will reuse them.
+  cyclingArrows[index].is_available = NULL;
+
+  // Entries after the last live one are not part of the queue anymore.
+  while (cyclingArrowCount > CYCLING_ARROW_BUILTIN_COUNT &&
+         cyclingArrows[cyclingArrowCount - 1].is_available == NULL) {
+    cyclingArrowCount--;
+  }
+
+  if (currentArrowIndex == index) {
+    currentArrowIndex = 0;
+  }
+
+  return 0;
+}
 
 static u16 sPlayerItemButtons[] = {
     BTN_B,
@@ -143,7 +175,8 @@ static void CycleArrows(Player* this, PlayState* play, Input* input,
   u8 equippedSlot = C_SLOT_EQUIP(0, bowButton) & 0xFF;
 
   for (int i = 0; i < cyclingArrowCount; i++) {
-    if ((cyclingArrows[i].item == equippedItem) &&
+    if ((cyclingArrows[i].is_available != NULL) &&
+        (cyclingArrows[i].item == equippedItem) &&
         (cyclingArrows[i].slot == equippedSlot)) {
       currentArrowIndex = i;
       break;
@@ -171,7 +204,8 @@ static void CycleArrows(Player* this, PlayState* play, Input* input,
       if (currentArrowIndex >= cyclingArrowCount) {
         currentArrowIndex = 0;
       }
-    } while (!cyclingArrows[currentArrowIndex].is_available());
+    } while ((cyclingArrows[currentArrowIndex].is_available == NULL) ||
+             !cyclingArrows[currentArrowIndex].is_available());
 
     // Set the current item
     ItemId currentItem = cyclingArrows[currentArrowIndex].item;
