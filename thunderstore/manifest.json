@@ -1,0 +1,7 @@
+{
+  "name": "Arrow_Cycling",
+  "version_number": "1.0.2",
+  "website_url": "https://github.com/LoadingErr/mm_recomp_arrow_cycling",
+  "description": "Allows cycling between arrow types with L or R while aiming the bow.",
+  "dependencies": []
+}
