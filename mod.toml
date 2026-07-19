@@ -24,7 +24,7 @@ short_description = "Cycle between arrow types."
 
 # Authors of this mod.
 
-authors = ["LoadingError", "danielryb", "LT_Schmiddy", "PK Cheap"]
+authors = ["LoadingError", "danielryb", "LT_Schmiddy", "PKCheap"]
 
 # ID of the target recomp game.
 game_id = "mm"

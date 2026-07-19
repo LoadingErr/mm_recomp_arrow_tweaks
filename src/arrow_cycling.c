@@ -19,7 +19,6 @@ typedef enum {
 #define CFG_CYCLING_MODE ((ArrowCycling)recomp_get_config_u32("arrow_cycling"))
 
 enum {
-  kArrowDeathCooldownFrames = 40,
   kMagicArrowChangeResetFrame = 3,
   kMagicArrowChangeWaitFrame = 2,
   kMagicArrowChangeConsumeFrame = 1,
@@ -29,7 +28,6 @@ typedef struct {
   int typeChangeTimer;
   ItemId previousBowItem;
   ItemId currentBowItem;
-  int arrowDeathTimer;
 } ArrowMagicChangeState;
 
 extern u16 D_8085CFB0[];
@@ -43,7 +41,19 @@ s32 func_808305BC(PlayState* play, Player* player, ItemId* item,
                   ArrowType* typeParam);
 
 static ArrowMagicChangeState sArrowMagicChange;
+static bool sArrowReleasedThisUpdate;
 static bool sDeferBowMagicAudio;
+
+typedef struct {
+  Player* player;
+  PlayState* play;
+  Input* input;
+  bool valid;
+  bool canCycleArrows;
+  bool cycleButtonPressed;
+} ArrowCyclingUpdateContext;
+
+static ArrowCyclingUpdateContext sArrowCyclingUpdateContext;
 static int sCyclingArrowCount = CYCLING_ARROW_BUILTIN_COUNT;
 static int sCurrentArrowIndex;
 
@@ -202,7 +212,7 @@ static void ScheduleArrowMagicChange(const Player* player,
 static void UpdateArrowMagicChange(PlayState* play) {
   switch (sArrowMagicChange.typeChangeTimer) {
     case kMagicArrowChangeResetFrame:
-      if (sArrowMagicChange.currentBowItem == ITEM_BOW) {
+      if (!IsMagicBowItem(sArrowMagicChange.currentBowItem)) {
         Magic_Reset(play);
       }
       break;
@@ -210,7 +220,7 @@ static void UpdateArrowMagicChange(PlayState* play) {
       // Leave one frame for the previous magic preview to settle.
       break;
     case kMagicArrowChangeConsumeFrame:
-      if (sArrowMagicChange.currentBowItem != ITEM_BOW) {
+      if (IsMagicBowItem(sArrowMagicChange.currentBowItem)) {
         Magic_Consume(play, GetMagicArrowCost(sArrowMagicChange.currentBowItem),
                       MAGIC_CONSUME_WAIT_PREVIEW);
       }
@@ -230,6 +240,17 @@ static bool IsArrowEntryAvailable(const CyclingArrowEntry* entry) {
   return !IsEmptyArrowEntry(entry) && entry->is_available();
 }
 
+static int FindArrowEntryIndex(ItemId item, u8 slot) {
+  for (int i = 0; i < sCyclingArrowCount; i++) {
+    const CyclingArrowEntry* entry = &sCyclingArrows[i];
+    if (!IsEmptyArrowEntry(entry) && (entry->item == item) &&
+        (entry->slot == slot)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 static const u16 sPlayerItemButtons[] = {
     BTN_B,
     BTN_CLEFT,
@@ -241,7 +262,8 @@ static EquipSlot FindBowButton(void) {
   for (EquipSlot button = EQUIP_SLOT_C_LEFT; button <= EQUIP_SLOT_C_RIGHT;
        button++) {
     ItemId item = gSaveContext.save.saveInfo.equips.buttonItems[0][button];
-    if (IsBowItem(item)) {
+    u8 slot = C_SLOT_EQUIP(0, button) & 0xFF;
+    if (IsBowItem(item) || (FindArrowEntryIndex(item, slot) >= 0)) {
       return button;
     }
   }
@@ -250,26 +272,27 @@ static EquipSlot FindBowButton(void) {
 }
 
 static void SyncCurrentArrowIndex(EquipSlot bowButton) {
-  u8 equippedItem = gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton];
+  ItemId equippedItem =
+      gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton];
   u8 equippedSlot = C_SLOT_EQUIP(0, bowButton) & 0xFF;
-
-  for (int i = 0; i < sCyclingArrowCount; i++) {
-    CyclingArrowEntry* entry = &sCyclingArrows[i];
-    if (!IsEmptyArrowEntry(entry) && entry->item == equippedItem &&
-        entry->slot == equippedSlot) {
-      sCurrentArrowIndex = i;
-      return;
-    }
+  int index = FindArrowEntryIndex(equippedItem, equippedSlot);
+  if (index >= 0) {
+    sCurrentArrowIndex = index;
   }
 }
 
-static void SelectNextAvailableArrow(void) {
+static bool SelectNextAvailableArrow(void) {
+  int initialIndex = sCurrentArrowIndex;
   do {
     sCurrentArrowIndex++;
     if (sCurrentArrowIndex >= sCyclingArrowCount) {
       sCurrentArrowIndex = 0;
     }
-  } while (!IsArrowEntryAvailable(&sCyclingArrows[sCurrentArrowIndex]));
+    if (IsArrowEntryAvailable(&sCyclingArrows[sCurrentArrowIndex])) {
+      return true;
+    }
+  } while (sCurrentArrowIndex != initialIndex);
+  return false;
 }
 
 static void UpdatePlayerBowAction(Player* player, ItemId bowItem) {
@@ -289,7 +312,11 @@ static void UpdatePlayerBowAction(Player* player, ItemId bowItem) {
       itemAction = PLAYER_IA_BOW_LIGHT;
       break;
     default:
-      return;
+      /* External non-elemental entries use normal bow behavior. Their owning
+       * mod can layer custom projectile behavior on the registered item/slot.
+       */
+      itemAction = PLAYER_IA_BOW;
+      break;
   }
 
   player->heldItemAction = itemAction;
@@ -335,7 +362,7 @@ static void UpdateBowMagicAudio(ItemId bowItem, bool selectedArrowChanged) {
 }
 
 static void CycleArrows(Player* player, PlayState* play, Input* input,
-                        u16 cycleButton) {
+                        bool cycleButtonPressed, bool arrowReleased) {
   EquipSlot bowButton = FindBowButton();
   if (bowButton == EQUIP_SLOT_NONE) {
     return;
@@ -348,19 +375,14 @@ static void CycleArrows(Player* player, PlayState* play, Input* input,
   ItemId previousBowItem =
       gSaveContext.save.saveInfo.equips.buttonItems[0][bowButton];
 
-  if (CHECK_BTN_ALL(input->press.button, cycleButton)) {
-    if (sArrowMagicChange.arrowDeathTimer > 0 &&
-        sCyclingArrows[sCurrentArrowIndex].item != ITEM_BOW) {
+  if (cycleButtonPressed) {
+    if (arrowReleased) {
       Audio_PlaySfx(NA_SE_SY_ERROR);
-      return;
+    } else if (SelectNextAvailableArrow()) {
+      EquipArrow(play, player, bowButton, &sCyclingArrows[sCurrentArrowIndex]);
+    } else {
+      Audio_PlaySfx(NA_SE_SY_ERROR);
     }
-
-    SelectNextAvailableArrow();
-    EquipArrow(play, player, bowButton, &sCyclingArrows[sCurrentArrowIndex]);
-  }
-
-  if (Player_CanCycleArrows(player)) {
-    input->press.button &= ~(BTN_R | BTN_L);
   }
 
   ItemId currentBowItem =
@@ -403,7 +425,7 @@ static void TrySpawnNockedArrow(Player* player, PlayState* play) {
 
 RECOMP_CALLBACK("*", recomp_on_init) void on_startup() {
   sArrowMagicChange.typeChangeTimer = 0;
-  sArrowMagicChange.arrowDeathTimer = 0;
+  sArrowReleasedThisUpdate = false;
 }
 
 RECOMP_PATCH s32 func_808306F8(Player* player, PlayState* play) {
@@ -442,7 +464,10 @@ void pre_func_80831194(PlayState* play, Player* player) {
     return;
   }
 
-  sArrowMagicChange.arrowDeathTimer = kArrowDeathCooldownFrames;
+  if ((player->heldActor != NULL) && !Player_IsHoldingHookshot(player)) {
+    sArrowReleasedThisUpdate = true;
+  }
+
   if (gSaveContext.minigameStatus == MINIGAME_STATUS_ACTIVE ||
       play->bButtonAmmoPlusOne != 0 || player->heldActor == NULL ||
       Player_IsHoldingHookshot(player)) {
@@ -482,6 +507,7 @@ void pre_MapDisp_Update(PlayState* play) {
 
 RECOMP_HOOK("Player_UpdateCommon")
 void pre_Player_UpdateCommon(Player* player, PlayState* play, Input* input) {
+  sArrowCyclingUpdateContext.valid = false;
   // This hook also runs for Kafei's actor, which must not be modified.
   if (!IsMainPlayer(player)) {
     return;
@@ -489,6 +515,10 @@ void pre_Player_UpdateCommon(Player* player, PlayState* play, Input* input) {
 
   ArrowCycling cyclingMode = CFG_CYCLING_MODE;
   bool canCycleArrows = Player_CanCycleArrows(player);
+  u16 cycleButton = (cyclingMode == CYCLING_MODE_L) ? BTN_L : BTN_R;
+  bool cycleButtonPressed = canCycleArrows &&
+                            (cyclingMode != CYCLING_MODE_NONE) &&
+                            CHECK_BTN_ALL(input->press.button, cycleButton);
 
   // Prevent shielding while aiming when cycling with R.
   if (cyclingMode == CYCLING_MODE_R) {
@@ -500,23 +530,40 @@ void pre_Player_UpdateCommon(Player* player, PlayState* play, Input* input) {
     }
   }
 
-  // Wait briefly after an arrow is destroyed before allowing a switch.
-  if (sArrowMagicChange.arrowDeathTimer > 0) {
-    sArrowMagicChange.arrowDeathTimer--;
-  }
-
+  /* Consume L/R before native player handling, but defer the equipment change
+   * until after that handling has either loosed the arrow or left it nocked.
+   */
   if (canCycleArrows) {
-    if (cyclingMode == CYCLING_MODE_L) {
-      CycleArrows(player, play, input, BTN_L);
-    } else if (cyclingMode == CYCLING_MODE_R) {
-      CycleArrows(player, play, input, BTN_R);
-    }
+    input->press.button &= ~(BTN_R | BTN_L);
+  }
+  sArrowReleasedThisUpdate = false;
+  sArrowCyclingUpdateContext = (ArrowCyclingUpdateContext){
+      player, play, input, true, canCycleArrows, cycleButtonPressed};
+}
+
+RECOMP_HOOK_RETURN("Player_UpdateCommon")
+void post_Player_UpdateCommon(void) {
+  ArrowCyclingUpdateContext ctx = sArrowCyclingUpdateContext;
+  sArrowCyclingUpdateContext.valid = false;
+  if (!ctx.valid) {
+    return;
   }
 
-  UpdateArrowMagicChange(play);
+  if (ctx.canCycleArrows) {
+    CycleArrows(ctx.player, ctx.play, ctx.input, ctx.cycleButtonPressed,
+                sArrowReleasedThisUpdate);
+  }
+  UpdateArrowMagicChange(ctx.play);
 }
 
 RECOMP_EXPORT int AddArrowEntry(CyclingArrowEntry entry) {
+  if (entry.is_available == NULL) {
+    return -1;
+  }
+  if (FindArrowEntryIndex(entry.item, entry.slot) >= 0) {
+    return -1;
+  }
+
   // Reuse removed entries so other mods can retain their stable indices.
   for (int i = CYCLING_ARROW_BUILTIN_COUNT; i < sCyclingArrowCount; i++) {
     if (IsEmptyArrowEntry(&sCyclingArrows[i])) {
@@ -539,7 +586,8 @@ RECOMP_EXPORT int AddArrowEntry(CyclingArrowEntry entry) {
 RECOMP_EXPORT int RemoveArrowEntry(int index) {
   // Built-ins guarantee a valid base arrow, so only external entries can be
   // removed.
-  if (index < CYCLING_ARROW_BUILTIN_COUNT || index >= sCyclingArrowCount) {
+  if (index < CYCLING_ARROW_BUILTIN_COUNT || index >= sCyclingArrowCount ||
+      IsEmptyArrowEntry(&sCyclingArrows[index])) {
     return -1;
   }
 

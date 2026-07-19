@@ -50,15 +50,16 @@ void my_mod_init(void) {
 }
 ```
 
-`AddArrowEntry` returns a stable index, or `-1` when the 16-entry registry is
-full. Use an item/slot pair that is unique among cycling entries. `is_available`
-is called while cycling and must be non-null, fast, and safe to call repeatedly.
-The entry and callback must remain valid until it is removed.
+`AddArrowEntry` returns a stable index, or `-1` if the callback is null, the
+item/slot pair is already registered, or the 16-entry registry is full.
+`is_available` is called while cycling and must be fast and safe to call
+repeatedly. The entry and callback must remain valid until it is removed.
 
 `RemoveArrowEntry` accepts only externally-added entries, returns `0` on
 success, and does not shift other entries. A removed slot may later be reused.
 The built-in normal and elemental arrow entries cannot be removed.
 
 Registering an entry makes it selectable; it does not itself create a new
-projectile type. A custom item still needs its own equipment and arrow-spawn
-behavior, as [Combo Arrows](https://github.com/a-priestley/MMRecompComboArrows) provides.
+projectile type. Non-elemental custom item IDs use normal-bow player behavior
+and still need their own equipment and arrow-spawn implementation, as
+[Combo Arrows](https://github.com/a-priestley/MMRecompComboArrows) provides.
